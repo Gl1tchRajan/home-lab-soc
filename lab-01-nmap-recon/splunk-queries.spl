@@ -1,46 +1,63 @@
-/* =============================================================================
-   Project:     SOC Lab 01 - Nmap Reconnaissance Detection
-   File:        splunk-queries.spl
-   Description: Detect, analyze, and visualize Nmap scanning activity using Splunk.
-   ============================================================================= */
+# ====================================================================
+# PROJECT: Network Reconnaissance Analysis (Lab 01)
+# PURPOSE: Detection and Analysis of Nmap Scanning Activity
+# AUTHOR: Rajan Kumar Mahato Tharu
+# ====================================================================
 
-/* -----------------------------------------------------------------------------
-   1. DATA INGESTION VALIDATION
-   Purpose: Confirm Windows Security logs are being ingested into Splunk.
-   ----------------------------------------------------------------------------- */
-index=* (EventCode=5152 OR EventCode=5156)
-| stats count by EventCode, host
+# --------------------------------------------------------------------
+# STAGE 1: RAW DATA DISCOVERY
+# --------------------------------------------------------------------
+# Description: Initial check to verify that Windows Security logs 
+# are being ingested correctly from the Universal Forwarder.
+
+index=* EventCode=5152 
+| head 10
+
+
+# --------------------------------------------------------------------
+# STAGE 2: MANUAL FIELD EXTRACTION (Analyst Level)
+# --------------------------------------------------------------------
+# Description: Using Regular Expressions (rex) to manually pull 
+# data from the _raw log. This is useful for ad-hoc investigation 
+# but inefficient for long-term use.
+
+index=* EventCode=5152 
+| rex field=_raw "Source Address:\s+(?<src_ip>\d+\.\d+\.\d+\.\d+)"
+| rex field=_raw "Destination Port:\s+(?<dest_port>\d+)"
+| stats count by src_ip, dest_port
 | sort - count
 
 
-/* -----------------------------------------------------------------------------
-   2. RECONNAISSANCE DETECTION (NMAP SCANNING ACTIVITY)
-   MITRE ATT&CK: T1046 - Network Service Discovery
-   Purpose: Identify attacker IP and targeted ports using regex extraction.
-   ----------------------------------------------------------------------------- */
-index=* (EventCode=5152 OR EventCode=5156)
-| rex field=_raw "Source Address:\s+(?<src_ip>\d+\.\d+\.\d+\.\d+)"
-| rex field=_raw "Destination Port:\s+(?<dest_port>\d+)"
-| stats count as scan_attempts by src_ip, dest_port, EventCode
-| rename src_ip as "Attacker IP", dest_port as "Target Port"
-| sort - scan_attempts
+# --------------------------------------------------------------------
+# STAGE 3: OPTIMIZED ANALYTICS (Admin/Engineer Level) 🏆
+# --------------------------------------------------------------------
+# Description: These queries rely on Permanent Field Extractions 
+# (Knowledge Objects) configured in Splunk Settings. 
+# No 'rex' is required, making the search significantly faster.
+
+# 1. High-Level Summary of Blocked Traffic
+index=* EventCode=5152
+| stats count by src_ip, dest_port, app_name
+| sort - count
+| rename src_ip as "Attacker IP", dest_port as "Target Port", app_name as "Process Path"
+
+# 2. Identifying Targeted System Processes (LSASS/System)
+index=* EventCode=5152
+| stats count by app_name
+| sort - count
+
+# 3. Time-Series Analysis of the Attack (Visualizing the Spike)
+index=* EventCode=5152
+| timechart span=1m count by src_ip
 
 
-/* -----------------------------------------------------------------------------
-   3. ATTACK SURFACE ANALYSIS (DC = Distinct Count)
-   Purpose: Identify the intensity of the scan and how many different ports 
-            the attacker touched (Distinct Count).
-   ----------------------------------------------------------------------------- */
-index=* (EventCode=5152 OR EventCode=5156)
-| rex field=_raw "Source Address:\s+(?<src_ip>\d+\.\d+\.\d+\.\d+)"
-| rex field=_raw "Destination Port:\s+(?<dest_port>\d+)"
-| stats count as total_events, dc(dest_port) as "Unique Ports Targeted" by src_ip
-| sort - total_events
+# --------------------------------------------------------------------
+# STAGE 4: SECURITY ALERTS (Conceptual)
+# --------------------------------------------------------------------
+# Description: Logic for a potential alert to trigger when 
+# scanning behavior is detected.
 
-
-/* -----------------------------------------------------------------------------
-   4. TIME-BASED VISUALIZATION (RECONNAISSANCE PATTERN)
-   Purpose: Visualize scan bursts and firewall activity over time.
-   ----------------------------------------------------------------------------- */
-index=* (EventCode=5152 OR EventCode=5156)
-| timechart span=1m count by EventCode
+index=* EventCode=5152
+| stats dc(dest_port) as unique_ports_scanned by src_ip
+| where unique_ports_scanned > 50
+| rename src_ip as "Potential Scanner"
