@@ -1,8 +1,7 @@
 /* =============================================================================
    Project:     SOC Lab 01 - Nmap Reconnaissance Detection
    File:        splunk-queries.spl
-   Description: Standardized SPL queries for identifying Nmap scanning patterns
-                and host-based firewall interactions using advanced field extraction.
+   Description: Detect, analyze, and visualize Nmap scanning activity using Splunk.
    ============================================================================= */
 
 /* -----------------------------------------------------------------------------
