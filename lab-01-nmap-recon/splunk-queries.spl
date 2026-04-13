@@ -1,62 +1,59 @@
 /* =============================================================================
-Project: SOC Lab 01 - Nmap Reconnaissance Detection
-File: splunk-queries.spl
-Description: SPL queries for identifying and analyzing Nmap scanning patterns.
-============================================================================= */
+   Project:     SOC Lab 01 - Nmap Reconnaissance Detection
+   File:        splunk-queries.spl
+   Description: Standardized SPL queries for identifying Nmap scanning patterns
+                and host-based firewall interactions.
+   ============================================================================= */
 
 
-/* =============================================================================
-1. GENERAL RECONNAISSANCE OVERVIEW
-Monitors all traffic originating from the suspected attacker IP.
-Replace 192.168.56.* with your actual Kali Linux IP.
-============================================================================= */
-
-index=* "192.168.56.*"
-| table _time host source sourcetype _raw
+/* -----------------------------------------------------------------------------
+   1. GENERAL RECONNAISSANCE OVERVIEW
+   Purpose: Broad search for all activity originating from the Attacker IP.
+   Action:  Replace "192.168.56.*" with your specific Kali Linux IP.
+   ----------------------------------------------------------------------------- */
+index=* sourcetype="XmlWinEventLog" "192.168.56.*"
+| table _time, host, source, EventCode, _raw
 | sort - _time
 
 
-/* =============================================================================
-2. SUCCESSFUL SERVICE DISCOVERY (Firewall: OFF)
-Event ID 5156 - Connection Allowed by Windows Filtering Platform
-Identifies ports successfully discovered by attacker.
-============================================================================= */
-
+/* -----------------------------------------------------------------------------
+   2. SUCCESSFUL SERVICE DISCOVERY (Firewall: OFF)
+   Purpose: Monitors Event ID 5156 (Connection Allowed).
+   Significance: Identifies which ports the attacker successfully enumerated.
+   ----------------------------------------------------------------------------- */
 index=* sourcetype="XmlWinEventLog" EventCode=5156
-| stats count by src_ip dest_port transport
-| rename src_ip as Attacker_IP dest_port as Target_Port transport as Protocol
+| stats count by src_ip, dest_port, transport
+| rename src_ip as Attacker_IP, dest_port as Target_Port, transport as Protocol
 | sort - count
 
 
-/* =============================================================================
-3. DETECTING BLOCKED STEALTH SCANS (Firewall: ON)
-Event ID 5152 - Packet Blocked by Windows Filtering Platform
-Primary indicator of Nmap port scanning activity.
-============================================================================= */
-
+/* -----------------------------------------------------------------------------
+   3. DETECTING BLOCKED STEALTH SCANS (Firewall: ON)
+   Purpose: Monitors Event ID 5152 (Packet Blocked).
+   Significance: The primary signature for Nmap activity when a firewall is active.
+   ----------------------------------------------------------------------------- */
 index=* sourcetype="XmlWinEventLog" EventCode=5152
-| stats count by src_ip dest_port protocol
-| rename src_ip as Attacker_IP dest_port as Target_Port protocol as Protocol
+| stats count by src_ip, dest_port, protocol
+| rename src_ip as Attacker_IP, dest_port as Target_Port, protocol as Protocol
 | sort - count
 
 
-/* =============================================================================
-4. NMAP SCAN SIGNATURE (TIME SERIES ANALYSIS)
-Shows spike in scan activity using allowed + blocked events.
-============================================================================= */
-
-index=* (EventCode=5156 OR EventCode=5152)
+/* -----------------------------------------------------------------------------
+   4. NMAP SCAN SIGNATURE (TIME SERIES ANALYSIS)
+   Purpose: Visualizes the volume of scan traffic over time.
+   Significance: An abrupt vertical spike is a classic "fingerprint" of Nmap.
+   ----------------------------------------------------------------------------- */
+index=* "192.168.56.*" (EventCode=5156 OR EventCode=5152)
 | timechart span=1m count by EventCode
 
 
-/* =============================================================================
-5. POST-RECONNAISSANCE ANALYSIS (BRUTE FORCE DETECTION)
-Event ID 4625 - Failed login attempts
-Detects possible exploitation after reconnaissance phase.
-============================================================================= */
-
+/* -----------------------------------------------------------------------------
+   5. BRUTE FORCE TRANSITION (POST-RECONNAISSANCE)
+   Purpose: Monitors Event ID 4625 (Failed Login).
+   Significance: Detects the pivot from "Scanning" to "Exploitation" (e.g. Hydra).
+   ----------------------------------------------------------------------------- */
 index=* sourcetype="WinEventLog:Security" EventCode=4625
-| stats count by TargetUserName src_ip
+| stats count by TargetUserName, src_ip
 | where count > 5
-| rename count as Failed_Attempts TargetUserName as Targeted_User src_ip as Attacker_IP
+| rename count as Failed_Attempts, TargetUserName as Targeted_User, src_ip as Attacker_IP
 | sort - Failed_Attempts
