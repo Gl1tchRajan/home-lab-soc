@@ -47,9 +47,8 @@ Executed a **SYN Stealth Scan (`-sS`)** and **Service Enumeration (`-sV`)** unde
 Ingested Windows Security logs into Splunk to identify reconnaissance signatures:
 - **Event ID 5156:** Authorized/Allowed connections when security was relaxed.
 - **Event ID 5152:** Blocked packet attempts, providing a "Blue Team" view of a stealth scan.
-[Splunk Detection](./Lab%2001%20nmap%20screenshots/10-splunk-chart.jpeg)
+![Splunk Detection](./Lab%2001%20nmap%20screenshots/10-splunk-chart.jpeg)
 > **Visualized Attack Spike:** A distinct spike in blocked connections (Event ID 5152) reveals the automated scanning activity that appeared "silent" to the attacker.
-
 ---
 
 ## 📂 Repository Structure
