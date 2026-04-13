@@ -1,1 +1,51 @@
+# =============================================================================
+# Project: SOC Lab - Network Reconnaissance Detection
+# Description: This file contains the Splunk Search Processing Language (SPL) 
+#              queries used to identify and analyze Nmap scanning activity.
+# =============================================================================
 
+# 1. IDENTIFYING ATTACKER FOOTPRINT
+# Search for all activity associated with the Kali Linux IP address.
+# Replace <KALI_IP> with your actual Kali VM IP.
+# -----------------------------------------------------------------------------
+index=* "192.168.56.*" 
+| table _time, host, source, sourcetype, _raw
+| sort - _time
+
+
+# 2. DETECTING SUCCESSFUL SERVICE DISCOVERY (Firewall OFF)
+# Monitors Event ID 5156: Windows Filtering Platform allowed a connection.
+# Used to visualize what an attacker successfully "sees."
+# -----------------------------------------------------------------------------
+index=* sourcetype="XmlWinEventLog" EventCode=5156
+| stats count by src_ip, dest_port, transport
+| rename src_ip as "Attacker_IP", dest_port as "Target_Port"
+| sort - count
+
+
+# 3. DETECTING BLOCKED RECONNAISSANCE (Firewall ON)
+# Monitors Event ID 5152: Windows Filtering Platform blocked a packet.
+# This reveals scanning attempts even when the target appears "Filtered" to Nmap.
+# -----------------------------------------------------------------------------
+index=* sourcetype="XmlWinEventLog" EventCode=5152
+| stats count by src_ip, dest_port, protocol
+| rename src_ip as "Attacker_IP", dest_port as "Target_Port"
+| sort - count
+
+
+# 4. PORT SCAN SIGNATURE ANALYSIS (Time-Series)
+# Visualizes the frequency of connection attempts. A sharp spike in a short 
+# duration is a classic signature of an automated Nmap scan.
+# -----------------------------------------------------------------------------
+index=* (EventCode=5156 OR EventCode=5152)
+| timechart span=1m count by EventCode
+
+
+# 5. PREPARING FOR BRUTE FORCE (Event ID 4625)
+# Tracks failed login attempts. This is used to pivot from Reconnaissance 
+# to the Exploitation phase (e.g., using Hydra).
+# -----------------------------------------------------------------------------
+index=* sourcetype="WinEventLog:Security" EventCode=4625
+| stats count by TargetUserName, src_ip
+| where count > 5
+| rename count as "Failed_Attempts"
