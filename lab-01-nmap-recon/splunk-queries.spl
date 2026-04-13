@@ -6,7 +6,7 @@
 
 # 1. IDENTIFYING ATTACKER FOOTPRINT
 # Search for all activity associated with the Kali Linux IP address.
-# Replace <KALI_IP> with your actual Kali VM IP.
+# Replace "192.168.56.*" with your specific subnet or Kali IP.
 # -----------------------------------------------------------------------------
 index=* "192.168.56.*" 
 | table _time, host, source, sourcetype, _raw
@@ -15,7 +15,7 @@ index=* "192.168.56.*"
 
 # 2. DETECTING SUCCESSFUL SERVICE DISCOVERY (Firewall OFF)
 # Monitors Event ID 5156: Windows Filtering Platform allowed a connection.
-# Used to visualize what an attacker successfully "sees."
+# Used to visualize what an attacker successfully "sees" during a scan.
 # -----------------------------------------------------------------------------
 index=* sourcetype="XmlWinEventLog" EventCode=5156
 | stats count by src_ip, dest_port, transport
@@ -25,7 +25,7 @@ index=* sourcetype="XmlWinEventLog" EventCode=5156
 
 # 3. DETECTING BLOCKED RECONNAISSANCE (Firewall ON)
 # Monitors Event ID 5152: Windows Filtering Platform blocked a packet.
-# This reveals scanning attempts even when the target appears "Filtered" to Nmap.
+# This reveals scanning attempts even when Nmap reports ports as "Filtered."
 # -----------------------------------------------------------------------------
 index=* sourcetype="XmlWinEventLog" EventCode=5152
 | stats count by src_ip, dest_port, protocol
@@ -41,11 +41,13 @@ index=* (EventCode=5156 OR EventCode=5152)
 | timechart span=1m count by EventCode
 
 
-# 5. PREPARING FOR BRUTE FORCE (Event ID 4625)
-# Tracks failed login attempts. This is used to pivot from Reconnaissance 
-# to the Exploitation phase (e.g., using Hydra).
+# 5. DETECTING BRUTE FORCE ATTEMPTS (Exploitation Phase)
+# Tracks failed login attempts (Event ID 4625). Useful for identifying 
+# Hydra or manual password guessing attacks following a scan.
 # -----------------------------------------------------------------------------
 index=* sourcetype="WinEventLog:Security" EventCode=4625
 | stats count by TargetUserName, src_ip
 | where count > 5
+| rename count as "Failed_Attempts", TargetUserName as "Targeted_User", src_ip as "Attacker_IP"
+| sort - Failed_Attempts
 | rename count as "Failed_Attempts"
