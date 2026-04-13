@@ -1,53 +1,62 @@
-# =============================================================================
-# Project: SOC Lab - Network Reconnaissance Detection
-# Description: This file contains the Splunk Search Processing Language (SPL) 
-#              queries used to identify and analyze Nmap scanning activity.
-# =============================================================================
+/* =============================================================================
+Project: SOC Lab 01 - Nmap Reconnaissance Detection
+File: splunk-queries.spl
+Description: SPL queries for identifying and analyzing Nmap scanning patterns.
+============================================================================= */
 
-# 1. IDENTIFYING ATTACKER FOOTPRINT
-# Search for all activity associated with the Kali Linux IP address.
-# Replace "192.168.56.*" with your specific subnet or Kali IP.
-# -----------------------------------------------------------------------------
-index=* "192.168.56.*" 
-| table _time, host, source, sourcetype, _raw
+
+/* =============================================================================
+1. GENERAL RECONNAISSANCE OVERVIEW
+Monitors all traffic originating from the suspected attacker IP.
+Replace 192.168.56.* with your actual Kali Linux IP.
+============================================================================= */
+
+index=* "192.168.56.*"
+| table _time host source sourcetype _raw
 | sort - _time
 
 
-# 2. DETECTING SUCCESSFUL SERVICE DISCOVERY (Firewall OFF)
-# Monitors Event ID 5156: Windows Filtering Platform allowed a connection.
-# Used to visualize what an attacker successfully "sees" during a scan.
-# -----------------------------------------------------------------------------
+/* =============================================================================
+2. SUCCESSFUL SERVICE DISCOVERY (Firewall: OFF)
+Event ID 5156 - Connection Allowed by Windows Filtering Platform
+Identifies ports successfully discovered by attacker.
+============================================================================= */
+
 index=* sourcetype="XmlWinEventLog" EventCode=5156
-| stats count by src_ip, dest_port, transport
-| rename src_ip as "Attacker_IP", dest_port as "Target_Port"
+| stats count by src_ip dest_port transport
+| rename src_ip as Attacker_IP dest_port as Target_Port transport as Protocol
 | sort - count
 
 
-# 3. DETECTING BLOCKED RECONNAISSANCE (Firewall ON)
-# Monitors Event ID 5152: Windows Filtering Platform blocked a packet.
-# This reveals scanning attempts even when Nmap reports ports as "Filtered."
-# -----------------------------------------------------------------------------
+/* =============================================================================
+3. DETECTING BLOCKED STEALTH SCANS (Firewall: ON)
+Event ID 5152 - Packet Blocked by Windows Filtering Platform
+Primary indicator of Nmap port scanning activity.
+============================================================================= */
+
 index=* sourcetype="XmlWinEventLog" EventCode=5152
-| stats count by src_ip, dest_port, protocol
-| rename src_ip as "Attacker_IP", dest_port as "Target_Port"
+| stats count by src_ip dest_port protocol
+| rename src_ip as Attacker_IP dest_port as Target_Port protocol as Protocol
 | sort - count
 
 
-# 4. PORT SCAN SIGNATURE ANALYSIS (Time-Series)
-# Visualizes the frequency of connection attempts. A sharp spike in a short 
-# duration is a classic signature of an automated Nmap scan.
-# -----------------------------------------------------------------------------
+/* =============================================================================
+4. NMAP SCAN SIGNATURE (TIME SERIES ANALYSIS)
+Shows spike in scan activity using allowed + blocked events.
+============================================================================= */
+
 index=* (EventCode=5156 OR EventCode=5152)
 | timechart span=1m count by EventCode
 
 
-# 5. DETECTING BRUTE FORCE ATTEMPTS (Exploitation Phase)
-# Tracks failed login attempts (Event ID 4625). Useful for identifying 
-# Hydra or manual password guessing attacks following a scan.
-# -----------------------------------------------------------------------------
+/* =============================================================================
+5. POST-RECONNAISSANCE ANALYSIS (BRUTE FORCE DETECTION)
+Event ID 4625 - Failed login attempts
+Detects possible exploitation after reconnaissance phase.
+============================================================================= */
+
 index=* sourcetype="WinEventLog:Security" EventCode=4625
-| stats count by TargetUserName, src_ip
+| stats count by TargetUserName src_ip
 | where count > 5
-| rename count as "Failed_Attempts", TargetUserName as "Targeted_User", src_ip as "Attacker_IP"
+| rename count as Failed_Attempts TargetUserName as Targeted_User src_ip as Attacker_IP
 | sort - Failed_Attempts
-| rename count as "Failed_Attempts"
