@@ -37,7 +37,11 @@ To transition from a basic analyst to an **SIEM Administrator**, I implemented *
 ### 1. Attack Simulation
 Executed a **SYN Stealth Scan (`-sS`)** and **Service Enumeration (`-sV`)** under two conditions:
 - **Firewall OFF:** Proved full visibility of exposed services (SMB, RPC).
+![Nmap Result](./Lab%2001%20nmap%20screenshots/03-nmap-firewall-off.jpeg)
+> **Scenario 1:** With the firewall disabled, Nmap successfully enumerates all high-value services, providing a roadmap for further exploitation.
 - **Firewall ON:** Resulted in "Filtered" states, demonstrating the firewall's silent-drop behavior.
+![Nmap Result](./Lab%2001%20nmap%20screenshots/04-nmap-firewall-on.jpeg)
+> **Scenario 1:** With the firewall disabled, Nmap successfully enumerates all high-value services, providing a roadmap for further exploitation.
 
 ### 2. SIEM Detection & Correlation
 Ingested Windows Security logs into Splunk to identify reconnaissance signatures:
