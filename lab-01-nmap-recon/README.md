@@ -40,8 +40,8 @@ Executed a **SYN Stealth Scan (`-sS`)** and **Service Enumeration (`-sV`)** unde
 ![Nmap Result](./Lab%2001%20nmap%20screenshots/03-nmap-firewall-off.jpeg)
 > **Scenario 1:** With the firewall disabled, Nmap successfully enumerates all high-value services, providing a roadmap for further exploitation.
 - **Firewall ON:** Resulted in "Filtered" states, demonstrating the firewall's silent-drop behavior.
-![Nmap Result](./Lab%2001%20nmap%20screenshots/04-nmap-firewall-on.jpeg)
-> **Scenario 1:** With the firewall disabled, Nmap successfully enumerates all high-value services, providing a roadmap for further exploitation.
+![Nmap Filtered](Lab%2001%20nmap%20screenshots/04-nmap-firewall-on.jpeg)
+> **Extended Analysis:** Scenario 2 (Firewall Enabled). Nmap reports ports as **"Filtered."** This visualizes the impact of the Windows Defender Firewall's "Silent Drop" strategy, which hides the system's true service state from the attacker.
 
 ### 2. SIEM Detection & Correlation
 Ingested Windows Security logs into Splunk to identify reconnaissance signatures:
