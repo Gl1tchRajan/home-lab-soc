@@ -79,6 +79,10 @@ Even when the firewall blocked the scan, the Windows Filtering Platform (WFP) ge
 ![Event 5156 Details](Lab%2001%20nmap%20screenshots/09-event-5156-details.jpeg)
 > **Extended Analysis:** Deep-dive into **Event ID 5156 (Connection Allowed)**. This is used for comparison analysis to show traffic that successfully bypassed the firewall, helping to distinguish between a scan and a successful connection.
 
+### 11. Automated Field Extraction & Structured Analytics
+![Splunk Structured Table](Lab%2001%20nmap%20screenshots/11-splunk-structured-data.jpg)
+> **Extended Analysis:** Transitioning to professional SIEM administration. This view shows the results of implementing permanent **Field Extractions**. By automating the parsing of `src_ip`, `dest_port`, and `app_name`, the SOC can perform rapid, high-level analysis of blocked connections and the specific system processes (like `svchost.exe`) being targeted.
+
 ---
 
 ## 🛡️ Security Interpretation & Framework Mapping
