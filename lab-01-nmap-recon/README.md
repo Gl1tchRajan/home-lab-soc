@@ -9,7 +9,7 @@ Beyond basic detection, this lab highlights **SIEM Data Engineering** by impleme
 
 ## 🛠️ Lab Environment & Tools
 - **Attacker Node:** Kali Linux (Nmap 7.9x)
-- **Target Node:** Windows 10/11 (Target IP: `192.168.56.102`)
+- **Target Node:** Windows 10 (Target IP: `192.168.56.102`)
 - **SIEM Platform:** Splunk Enterprise on Ubuntu 22.04 LTS
 - **Logging:** Splunk Universal Forwarder + Windows Filtering Platform (WFP)
 - **Network:** Isolated VirtualBox Host-Only Adapter
