@@ -2,58 +2,46 @@
    Project:     SOC Lab 01 - Nmap Reconnaissance Detection
    File:        splunk-queries.spl
    Description: Standardized SPL queries for identifying Nmap scanning patterns
-                and host-based firewall interactions.
+                and host-based firewall interactions using advanced field extraction.
    ============================================================================= */
 
-
 /* -----------------------------------------------------------------------------
-   1. GENERAL RECONNAISSANCE OVERVIEW
-   Purpose: Broad search for all activity originating from the Attacker IP.
-   Action:  Replace "192.168.56.*" with your specific Kali Linux IP.
+   1. DATA INGESTION VALIDATION
+   Purpose: Confirm Windows Security logs are being ingested into Splunk.
    ----------------------------------------------------------------------------- */
-index=* sourcetype="XmlWinEventLog" "192.168.56.*"
-| table _time, host, source, EventCode, _raw
-| sort - _time
-
-
-/* -----------------------------------------------------------------------------
-   2. SUCCESSFUL SERVICE DISCOVERY (Firewall: OFF)
-   Purpose: Monitors Event ID 5156 (Connection Allowed).
-   Significance: Identifies which ports the attacker successfully enumerated.
-   ----------------------------------------------------------------------------- */
-index=* sourcetype="XmlWinEventLog" EventCode=5156
-| stats count by src_ip, dest_port, transport
-| rename src_ip as Attacker_IP, dest_port as Target_Port, transport as Protocol
+index=* (EventCode=5152 OR EventCode=5156)
+| stats count by EventCode, host
 | sort - count
 
 
 /* -----------------------------------------------------------------------------
-   3. DETECTING BLOCKED STEALTH SCANS (Firewall: ON)
-   Purpose: Monitors Event ID 5152 (Packet Blocked).
-   Significance: The primary signature for Nmap activity when a firewall is active.
+   2. RECONNAISSANCE DETECTION (NMAP SCANNING ACTIVITY)
+   MITRE ATT&CK: T1046 - Network Service Discovery
+   Purpose: Identify attacker IP and targeted ports using regex extraction.
    ----------------------------------------------------------------------------- */
-index=* sourcetype="XmlWinEventLog" EventCode=5152
-| stats count by src_ip, dest_port, protocol
-| rename src_ip as Attacker_IP, dest_port as Target_Port, protocol as Protocol
-| sort - count
+index=* (EventCode=5152 OR EventCode=5156)
+| rex field=_raw "Source Address:\s+(?<src_ip>\d+\.\d+\.\d+\.\d+)"
+| rex field=_raw "Destination Port:\s+(?<dest_port>\d+)"
+| stats count as scan_attempts by src_ip, dest_port, EventCode
+| rename src_ip as "Attacker IP", dest_port as "Target Port"
+| sort - scan_attempts
 
 
 /* -----------------------------------------------------------------------------
-   4. NMAP SCAN SIGNATURE (TIME SERIES ANALYSIS)
-   Purpose: Visualizes the volume of scan traffic over time.
-   Significance: An abrupt vertical spike is a classic "fingerprint" of Nmap.
+   3. ATTACK SURFACE ANALYSIS (DC = Distinct Count)
+   Purpose: Identify the intensity of the scan and how many different ports 
+            the attacker touched (Distinct Count).
    ----------------------------------------------------------------------------- */
-index=* "192.168.56.*" (EventCode=5156 OR EventCode=5152)
+index=* (EventCode=5152 OR EventCode=5156)
+| rex field=_raw "Source Address:\s+(?<src_ip>\d+\.\d+\.\d+\.\d+)"
+| rex field=_raw "Destination Port:\s+(?<dest_port>\d+)"
+| stats count as total_events, dc(dest_port) as "Unique Ports Targeted" by src_ip
+| sort - total_events
+
+
+/* -----------------------------------------------------------------------------
+   4. TIME-BASED VISUALIZATION (RECONNAISSANCE PATTERN)
+   Purpose: Visualize scan bursts and firewall activity over time.
+   ----------------------------------------------------------------------------- */
+index=* (EventCode=5152 OR EventCode=5156)
 | timechart span=1m count by EventCode
-
-
-/* -----------------------------------------------------------------------------
-   5. BRUTE FORCE TRANSITION (POST-RECONNAISSANCE)
-   Purpose: Monitors Event ID 4625 (Failed Login).
-   Significance: Detects the pivot from "Scanning" to "Exploitation" (e.g. Hydra).
-   ----------------------------------------------------------------------------- */
-index=* sourcetype="WinEventLog:Security" EventCode=4625
-| stats count by TargetUserName, src_ip
-| where count > 5
-| rename count as Failed_Attempts, TargetUserName as Targeted_User, src_ip as Attacker_IP
-| sort - Failed_Attempts
